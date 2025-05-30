@@ -1,0 +1,569 @@
+---
+title: "Modelo de Crecimiento de Solow"
+author: "Vázquez Mendoza Francisco, Ramírez Cazarez Carlos Alberto, Nava Calleros Arath"
+date: "24 de mayo del 2025"
+output:
+  html_document:
+    theme: cosmo
+    highlight: tango
+    css: styles.css
+    toc: true
+    toc_depth: 2
+    df_print: paged
+fontsize: 12pt
+mainfont: Arial
+
+---
+```{r}
+library(deSolve)
+library(broom)  
+library(ggplot2)
+library(ggtext)
+library(latex2exp)
+
+```
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,  
+                      warning = FALSE, 
+                      message = FALSE)
+
+```
+
+
+
+
+El modelo de crecimiento de Solow, propuesto por Robert Solow en 1956, es un marco teórico fundamental en la macroeconomía para entender los determinantes del crecimiento económico a largo plazo. Este modelo parte de una función de producción agregada, usualmente del tipo Cobb-Douglas, que relaciona el producto total de una economía con tres factores clave: el capital físico, el trabajo y el progreso tecnológico.
+
+```{r}
+# Parámetros del modelo
+A <- 1         # Nivel tecnológico
+alpha <- 0.3   # Participación del capital
+delta <- 0.1   # Tasa de depreciación
+s <- 0.2       # Tasa de ahorro
+k <- seq(0, 30, by = 0.1)
+
+# Cálculos
+y <- A * k^alpha               # Función de producción
+depreciacion <- delta * k       # Línea de depreciación
+inversion <- s * y             # Inversión
+k_steady <- (s*A/delta)^(1/(1-alpha))  # Estado estacionario
+
+# Gráfico con subtítulo descriptivo
+ggplot() +
+  geom_line(aes(x = k, y = y, color = "Función de producción (y = Ak^α)"), size = 1.2) +
+  geom_line(aes(x = k, y = depreciacion, color = "Depreciación (δk)"), linetype = "dashed", size = 1) +
+  geom_line(aes(x = k, y = inversion, color = "Inversión (sy = sAk^α)"), size = 1) +
+  geom_vline(xintercept = k_steady, linetype = "dotted", color = "red", size = 1) +
+  labs(title = "Modelo de Crecimiento de Solow",
+       subtitle = "Relación entre capital y producto por trabajador: Función de producción, depreciación e inversión",
+       x = "Capital por trabajador (k)",
+       y = "Producto por trabajador (y)",
+       color = "Elementos:",
+       caption = "El estado estacionario (línea vertical roja) ocurre cuando inversión = depreciación") +
+  scale_color_manual(
+    values = c("Función de producción (y = Ak^α)" = "darkblue",
+               "Depreciación (δk)" = "darkred",
+               "Inversión (sy = sAk^α)" = "darkgreen")
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, color = "gray30"),
+    plot.caption = element_text(hjust = 0, color = "red", face = "italic"),
+    axis.title = element_text(size = 11)
+  ) +
+  annotate("text", x = k_steady + 5, y = max(y)/2, 
+           label = paste("Estado estacionario\nk* =", round(k_steady, 2)), 
+           color = "red", size = 3.5)
+```
+
+
+A diferencia de teorías anteriores, Solow introdujo el concepto de **progreso tecnológico como un factor exógeno**, lo que permite explicar por qué algunas economías crecen de forma sostenida en el tiempo. 
+El modelo asume rendimientos constantes a escala, una **tasa de ahorro constante** y un **crecimiento poblacional constante**.
+
+Uno de sus principales aportes es la noción de **“estado estacionario”** o equilibrio de largo plazo, en el cual la economía deja de crecer en términos per cápita si no hay avances tecnológicos. En ausencia de innovación, el crecimiento del producto per cápita tiende a detenerse, ya que el capital por trabajador deja de incrementarse debido a la ley de rendimientos decrecientes. 
+
+```{r}
+A <- 1
+alpha <- 0.3
+delta <- 0.1
+s <- 0.2
+n <- 0.02  # Tasa crecimiento poblacional
+
+# Función para calcular la dinámica del capital
+simular_trayectoria <- function(periodos = 100, k_inicial = 1) {
+  k <- numeric(periodos)
+  k[1] <- k_inicial
+  
+  for(t in 2:periodos) {
+    k[t] <- (1 - delta - n)*k[t-1] + s*A*k[t-1]^alpha
+  }
+  
+  data.frame(
+    periodo = 1:periodos,
+    k = k,
+    y = A*k^alpha
+  )
+}
+
+# Simulación
+datos <- simular_trayectoria(periodos = 50)
+
+# Gráfico sin ecuaciones en la nota
+ggplot(datos, aes(x = periodo)) +
+  geom_line(aes(y = y, color = "Producto per cápita (y)"), size = 1.2) +
+  geom_line(aes(y = k, color = "Capital per cápita (k)"), linetype = "dashed", size = 1) +
+  geom_hline(yintercept = (s*A/(n + delta))^(1/(1-alpha)), 
+             color = "red", linetype = "dotted", size = 1) +
+  labs(title = "Estado Estacionario sin Innovación Tecnológica",
+       subtitle = "Efecto de los rendimientos decrecientes en el crecimiento a largo plazo",
+       x = "Tiempo",
+       y = "Nivel por trabajador",
+       color = "Variables",
+       caption = "El estado estacionario (línea roja) ocurre cuando la inversión iguala a la depreciación y el crecimiento poblacional") +  # Nota simplificada
+  scale_color_manual(values = c("Producto per cápita (y)" = "darkblue", 
+                                "Capital per cápita (k)" = "darkgreen")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  annotate("text", x = 40, y = (s*A/(n + delta))^(1/(1-alpha)) * 0.9, 
+           label = "Crecimiento se detiene\n(Estado estacionario)",
+           color = "red", size = 3.5)
+```
+
+**Explicación de la función de producción Cobb-Douglas**
+
+La función de producción Cobb-Douglas es una herramienta fundamental en economía para modelar la relación entre los factores de producción (capital y trabajo) y el producto total de una economía. Propuesta por Paul Douglas y Charles Cobb en 1928, esta función captura dos propiedades clave: rendimientos constantes a escala (duplicar los insumos duplica el producto) y rendimientos decrecientes de cada factor (aumentar un factor manteniendo el otro constante genera incrementos marginales decrecientes). 
+
+En el contexto del modelo de Solow, se utiliza para analizar cómo el capital (K), el trabajo (L) y la tecnología (A) interactúan para determinar el crecimiento económico a largo plazo. Su flexibilidad matemática permite derivar soluciones analíticas claras, como es el estado estacionario.
+
+```{r}
+
+A <- 1.3          
+alpha <- 0.33     # Participación del capital
+k <- seq(0, 30, length.out = 300)  # Capital por trabajador
+
+# Función Cobb-Douglas per cápita (fórmula clave)
+y <- A * k^alpha  # y = A*k^α
+
+
+ggplot(data.frame(k, y), aes(x = k, y = y)) +
+  # Línea principal
+  geom_line(color = "#2C3E50", linewidth = 1.2, alpha = 0.9) +
+  
+ 
+  labs(
+    title = expression(bold("Función de Producción Cobb-Douglas") ~ "(y = A"*k^alpha*")"),
+    x = expression(bold("Capital por trabajador" ~ (k == K/L))),
+    y = expression(bold("Producto por trabajador" ~ (y == Y/L))),
+    caption = bquote("Parámetros: " ~ A == .(A) ~ ", " ~ alpha == .(alpha))
+  ) +
+  
+  # Anotación con fórmula grande
+  annotate("text", x = max(k)*0.6, y = max(y)*0.3,
+           label = expression(y == A * phantom() * k^alpha),
+           parse = TRUE, size = 6, color = "#E74C3C") +
+  
+  # Estilo profesional
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", margin = margin(b = 15)),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+```
+
+```{r}
+
+
+
+ggplot() +
+  # Configurar área del gráfico
+  xlim(0, 10) + 
+  ylim(0, 10) +
+  
+  # Fondo cuadriculado estilo científico
+  theme_minimal() +
+  theme(
+    panel.background = element_rect(fill = "#F8F9FA"),  # Color de fondo
+    panel.grid.major = element_line(color = "#DEE2E6", linewidth = 0.3),  # Cuadrícula principal
+    panel.grid.minor = element_line(color = "#E9ECEF", linewidth = 0.15), # Cuadrícula secundaria
+    plot.background = element_rect(fill = "white"),      # Borde blanco
+    axis.title = element_blank(),                        # Ocultar ejes
+    axis.text = element_blank(),                         # Ocultar números
+    axis.ticks = element_blank()                         # Ocultar marcas
+  ) +
+  
+  # Fórmula principal con estilo LaTeX
+  annotate("text", x = 5, y = 6.5, 
+           label = expression(bold("FUNCIÓN COBB-DOUGLAS") ~~ 
+                             phantom() %->% 
+                             Y(t) == A(t) %.% K(t)^alpha %.% L(t)^{1-alpha}),
+           size = 6.5, color = "#2B3A4A", parse = TRUE) +
+  
+  # Versión per cápita
+  annotate("text", x = 5, y = 4, 
+           label = expression(bold("Versión per cápita:") ~~ 
+                             y(t) == A(t) %.% k(t)^alpha),
+           size = 5, color = "#495057", parse = TRUE) +
+  
+  # Notación adicional
+  annotate("text", x = 5, y = 3, 
+           label = expression(phantom() %=>% 
+                             y == frac(Y,L) ~~ "," ~~ k == frac(K,L)),
+           size = 4, color = "#6C757D", parse = TRUE)
+```
+
+
+¿Qué significa "neutralidad" para Solow? ¿Qué es la neutralidad de Hicks? ¿Y la de Harrod?
+
+*Neutralidad técnica*: Cambios en la tecnología que aumentan la producción sin alterar la tasa marginal de sustitución entre trabajo y capital. 
+
+*Neutralidad de Hicks*: El cambio técnico no afecta el equilibrio entre trabajo y capital; solo cambia un factor multiplicativo (A) en la función Y = A·F(K,L). 
+
+*Neutralidad de Harrod*: Se centra en mejoras en la eficiencia del trabajo manteniendo constante la relación capital-producto.
+
+
+```{r}
+ggplot() +
+  xlim(0, 10) +
+  ylim(0, 10) +
+  annotate("text", x = 5, y = 5, 
+           label = "Explicación del Modelo de Solow",
+           size = 10, 
+           fontface = "bold",
+           color = "#2C3E50") +  # Color azul oscuro profesional
+  theme_void() +  # Fondo vacío
+  theme(
+    plot.background = element_rect(fill = "#F8F9FA"),  # Fondo gris claro
+    panel.border = element_rect(color = "#DEE2E6", fill = NA, linewidth = 1)  # Borde sutil
+  )
+
+
+```
+
+```{r}
+ggplot() +
+  xlim(0, 10) + ylim(0, 10) +
+  theme_minimal() +
+  theme(
+    panel.background = element_rect(fill = "#F8F9FA"),
+    panel.grid.major = element_line(color = "#DEE2E6", linewidth = 0.3),
+    panel.grid.minor = element_line(color = "#E9ECEF", linewidth = 0.15),
+    plot.background = element_rect(fill = "white"),
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank()
+  ) +
+  annotate("text", x = 5, y = 6, 
+           label = expression(bold("Función de Producción Agregada") ~~
+                             Y(t) == A(t) %.% K(t)^alpha %.% L(t)^{1-alpha}),
+           size = 6, color = "#2C3E50", parse = TRUE) +
+  annotate("text", x = 5, y = 4.5, 
+           label = expression(phantom() %=>% 
+                             "Donde:" ~~
+                             alpha %in% group("[",list(0,1),"]") ~~ "," ~~
+                             frac(dY,dK) > 0 ~~ "," ~~
+                             frac(d^2*Y,dK^2) < 0),
+           size = 4, color = "#6C757D", parse = TRUE)
+```
+
+
+**EL MODELO**
+
+La dinámica del capital por trabajador efectivo es
+
+```{r}
+ggplot() +
+  xlim(0, 10) +
+  ylim(0, 10) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "#F8F9FA")) +
+  
+  # Ecuación principal
+  annotate("text", x = 5, y = 8,
+           label = TeX(r"($\dot{k}(t) = s \cdot k(t)^{\alpha} - (n + g + \delta) \cdot k(t)$)"),
+           size = 6, color = "#2C3E50", parse = TRUE) +
+  
+  # Explicación de variables
+  annotate("text", x = 5, y = 6.5, 
+           label = TeX(r"($k(t) = \frac{K(t)}{A(t)L(t)}$) (Capital por trabajador efectivo)"),
+           size = 4.5, color = "#495057", hjust = 0.5) +
+  
+  annotate("text", x = 5, y = 5.5,
+           label = TeX(r"($y = k(t)^{\alpha}$ (Función de producción intensiva Cobb-Douglas)"),
+           size = 4.5, color = "#495057", hjust = 0.5) +
+  
+  annotate("text", x = 5, y = 4.5,
+           label = TeX(r"($\alpha$ = Participación del capital en la producción)"),
+           size = 4.5, color = "#6C757D", hjust = 0.5) +
+  
+  annotate("text", x = 5, y = 4.0,
+           label = "s = Tasa de ahorro (0 < s < 1)",
+           size = 4.5, color = "#6C757D", hjust = 0.5) +
+  
+  annotate("text", x = 5, y = 3.5,
+           label = "n = Tasa crecimiento poblacional",
+           size = 4.5, color = "#6C757D", hjust = 0.5) +
+  
+  annotate("text", x = 5, y = 3.0,
+           label = TeX(r"(g = Tasa progreso tecnológico)"),
+           size = 4.5, color = "#6C757D", hjust = 0.5) +
+  
+  annotate("text", x = 5, y = 2.5,
+           label = TeX(r"($\delta$ = Tasa depreciación del capital)"),
+           size = 4.5, color = "#6C757D", hjust = 0.5) +
+  
+  # Marco teórico
+  labs(title = "Dinámica del Modelo de Solow",
+       subtitle = "Ecuación fundamental y variables clave") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14, color = "#2B3A4A"),
+        plot.subtitle = element_text(hjust = 0.5, size = 12, color = "#6C757D"))
+```
+
+Esta expresión es la ecuación fundamental del modelo de Solow y afirma que la tasa de cambio
+del stock de capital por unidad de trabajo efectivo es la diferencia entre dos términos. El primer
+término, s ∗ k[t]^α , es la inversión realizada por unidad de trabajo efectivo: el producto por
+unidad de trabajo efectivo es k[t]^α (se ha asumido una funcion de producción Cobb-Douglas), y
+la proporción de ese producto que se destina a la inversión es es s. El segundo término,
+(n+g+δ)*k[t] , es la inversión de reposición, es decir, el volumen de inversión que es necesario para mantener k constante . 
+
+```{r}
+# Función para simular el modelo de Solow
+simular_solow <- function(s = 0.25, d = 0.05, n = 0.02, a = 0.4, k0 = 1, periods = 200) {
+  k <- numeric(periods)
+  y <- numeric(periods)
+  
+  k[1] <- k0
+  y[1] <- k[1]^a
+  
+  for (t in 2:periods) {
+    y[t] <- k[t-1]^a
+    k[t] <- s * y[t] + (1 - d - n) * k[t-1]
+  }
+  
+  return(data.frame(periodo = 1:periods, k = k, y = y))
+}
+
+# Configuración de parámetros base
+params_base <- list(s = 0.25, d = 0.05, n = 0.02, a = 0.4)
+
+# Crear escenarios modificando un parámetro cada vez
+escenarios <- list(
+  list(s = 0.15, name = "Baja tasa de ahorro (s=0.15)"),
+  list(s = 0.35, name = "Alta tasa de ahorro (s=0.35)"),
+  list(d = 0.02, name = "Baja depreciación (d=0.02)"),
+  list(d = 0.08, name = "Alta depreciación (d=0.08)"),
+  list(n = 0.01, name = "Bajo crecimiento poblacional (n=0.01)"),
+  list(n = 0.04, name = "Alto crecimiento poblacional (n=0.04)"),
+  list(a = 0.3, name = "Menor participación capital (α=0.3)"),
+  list(a = 0.5, name = "Mayor participación capital (α=0.5)")
+)
+
+# Simular todos los escenarios
+resultados <- list()
+resultados$base <- simular_solow()
+
+for (esc in escenarios) {
+  params <- modifyList(params_base, esc[names(esc) != "name"])
+  resultados[[esc$name]] <- do.call(simular_solow, params)
+}
+
+# Configurar área de gráficos
+par(mfrow = c(3, 3), mar = c(4, 4, 2, 1))
+
+# Graficar cada escenario
+plot(resultados$base$periodo, resultados$base$k, type = "l", lwd = 2, col = "blue",
+     main = "Caso Base\n(s=0.25, d=0.05, n=0.02, α=0.4)",
+     xlab = "Periodo", ylab = "Capital por trabajador (k)")
+
+for (esc in escenarios) {
+  plot(resultados[[esc$name]]$periodo, resultados[[esc$name]]$k, type = "l", lwd = 2, col = "darkgreen",
+       main = esc$name,
+       xlab = "Periodo", ylab = "Capital por trabajador (k)")
+  lines(resultados$base$periodo, resultados$base$k, col = "gray", lty = 2)
+}
+
+# Resetear configuración gráfica
+par(mfrow = c(1, 1))
+
+# Gráfico comparativo de todos los escenarios
+plot(NULL, xlim = c(0, 200), ylim = c(0, max(resultados$base$k, na.rm = TRUE)),
+     main = "Comparación de todos los escenarios",
+     xlab = "Periodo", ylab = "Capital por trabajador (k)")
+
+cols <- rainbow(length(escenarios))
+for (i in seq_along(escenarios)) {
+  esc <- escenarios[[i]]
+  lines(resultados[[esc$name]]$k, col = cols[i], lwd = 2)
+}
+
+legend("bottomright", legend = sapply(escenarios, function(x) x$name),
+       col = cols, lwd = 2, cex = 0.7)
+```
+
+Las gráficas muestran la evolución del capital por trabajador (k) bajo diferentes parámetros del modelo. En el caso base (s=0.25, d=0.05, n=0.02, a=0.4), k converge a un estado estacionario, donde la inversión iguala a la depreciación y el crecimiento poblacional. Cada escenario modifica un parámetro clave, comparándose con el caso base (línea gris discontinua):
+
+Tasa de ahorro (s):
+
+s=0.15: Menor inversión → k alcanza un equilibrio más bajo.
+
+s=0.35: Mayor inversión → k converge a un nivel superior.
+
+Depreciación (d):
+
+d=0.02: Menor desgaste del capital → k se acumula más rápido.
+
+d=0.08: Mayor desgaste → Equilibrio más bajo por pérdida acelerada de capital.
+
+Crecimiento poblacional (n):
+
+n=0.01: Menor presión sobre k → Mayor acumulación per cápita.
+
+n=0.04: Dilución del capital → Equilibrio reducido.
+
+Participación del capital (a):
+
+a=0.3: Rendimientos decrecientes más pronunciados → Menor productividad marginal del capital.
+
+a=0.5: Mayor peso del capital en la producción → Acumulación más rápida y equilibrio elevado.
+
+En el gráfico comparativo final, todas las trayectorias se superponen, demostrando que:
+
+Aumentar s o reducir d/n desplaza el equilibrio hacia niveles más altos de k.
+
+Una a alta amplifica el efecto de la acumulación de capital, mientras que una a baja lo limita.
+
+Este análisis visual resalta cómo políticas que afecten s, d, n o a pueden alterar la trayectoria de crecimiento a largo plazo en el modelo de Solow.
+
+Partiendo del modelo 
+Quisimos adapatarlo al codigo de shiny para una mejor visualizacion
+
+```{r}
+library(shiny)
+library(ggplot2)
+
+# Función de simulación del modelo
+simular_solow <- function(s = 0.25, d = 0.05, n = 0.02, a = 0.4, k0 = 1, periods = 200) {
+  k <- numeric(periods)
+  y <- numeric(periods)
+  
+  k[1] <- k0
+  y[1] <- k[1]^a
+  
+  for (t in 2:periods) {
+    y[t] <- k[t-1]^a
+    k[t] <- s * y[t] + (1 - d - n) * k[t-1]
+  }
+  
+  data.frame(periodo = 1:periods, k = k, y = y)
+}
+
+# Interfaz de usuario
+ui <- fluidPage(
+  titlePanel("Simulador Interactivo del Modelo de Solow"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      wellPanel(
+        h4("Parámetros Base"),
+        sliderInput("s", "Tasa de ahorro (s)", 0.01, 0.5, 0.25, step = 0.01),
+        sliderInput("d", "Tasa de depreciación (d)", 0.01, 0.1, 0.05, step = 0.01),
+        sliderInput("n", "Crecimiento poblacional (n)", 0.0, 0.1, 0.02, step = 0.005),
+        sliderInput("a", "Participación del capital (α)", 0.1, 0.8, 0.4, step = 0.05)
+      ),
+      
+      wellPanel(
+        h4("Escenarios Comparativos"),
+        checkboxGroupInput("escenarios", "Seleccionar escenarios:",
+          choices = list(
+            "Alta tasa de ahorro (s=0.35)" = "s_high",
+            "Baja tasa de ahorro (s=0.15)" = "s_low",
+            "Alta depreciación (d=0.08)" = "d_high",
+            "Baja depreciación (d=0.02)" = "d_low",
+            "Alto crecimiento poblacional (n=0.04)" = "n_high",
+            "Bajo crecimiento poblacional (n=0.01)" = "n_low"
+          )
+        )
+      )
+    ),
+    
+    mainPanel(
+      plotOutput("solowPlot", height = "600px")
+    )
+  )
+)
+
+# Servidor
+server <- function(input, output) {
+  output$solowPlot <- renderPlot({
+    # Simular caso base
+    base <- simular_solow(s = input$s, d = input$d, n = input$n, a = input$a)
+    
+    # Inicializar lista de escenarios
+    escenarios <- list(
+      "Caso Base" = base
+    )
+    
+    # Simular escenarios seleccionados
+    if("s_high" %in% input$escenarios) {
+      escenarios[["Alta tasa de ahorro"]] <- simular_solow(s = 0.35, d = input$d, n = input$n, a = input$a)
+    }
+    if("s_low" %in% input$escenarios) {
+      escenarios[["Baja tasa de ahorro"]] <- simular_solow(s = 0.15, d = input$d, n = input$n, a = input$a)
+    }
+    if("d_high" %in% input$escenarios) {
+      escenarios[["Alta depreciación"]] <- simular_solow(d = 0.08, s = input$s, n = input$n, a = input$a)
+    }
+    if("d_low" %in% input$escenarios) {
+      escenarios[["Baja depreciación"]] <- simular_solow(d = 0.02, s = input$s, n = input$n, a = input$a)
+    }
+    if("n_high" %in% input$escenarios) {
+      escenarios[["Alto crecimiento pobl."]] <- simular_solow(n = 0.04, s = input$s, d = input$d, a = input$a)
+    }
+    if("n_low" %in% input$escenarios) {
+      escenarios[["Bajo crecimiento pobl."]] <- simular_solow(n = 0.01, s = input$s, d = input$d, a = input$a)
+    }
+    
+    # Crear dataframe para ggplot
+    df <- do.call(rbind, lapply(names(escenarios), function(nombre) {
+      data <- escenarios[[nombre]]
+      data$Escenario <- nombre
+      data
+    }))
+    
+    # Crear gráfico
+    ggplot(df, aes(x = periodo, y = k, color = Escenario)) +
+      geom_line(size = 1.2) +
+      labs(title = "Dinámica del Capital por Trabajador",
+           subtitle = "Modelo de Solow - Efecto de diferentes parámetros",
+           x = "Periodos",
+           y = "Capital por trabajador (k)",
+           caption = "Fuente: Simulación del modelo") +
+      theme_minimal(base_size = 14) +
+      theme(legend.position = "bottom",
+            plot.title = element_text(face = "bold", size = 18),
+            plot.subtitle = element_text(color = "gray40")) +
+      scale_color_manual(values = c("Caso Base" = "#2C3E50",
+                                    "Alta tasa de ahorro" = "#27AE60",
+                                    "Baja tasa de ahorro" = "#E74C3C",
+                                    "Alta depreciación" = "#8E44AD",
+                                    "Baja depreciación" = "#3498DB",
+                                    "Alto crecimiento pobl." = "#F39C12",
+                                    "Bajo crecimiento pobl." = "#16A085"))
+  })
+}
+
+# Ejecutar aplicación
+shinyApp(ui = ui, server = server)
+```
+
+**Conclusiones**
+Conclusiones Académicas del Modelo de Solow en Shiny
+
+El modelo de Solow, implementado en una aplicación Shiny, demuestra que el crecimiento económico de largo plazo depende críticamente del progreso tecnológico (g), mientras que parámetros como la tasa de ahorro (s), depreciación (delta) y crecimiento poblacional (n) solo determinan el nivel de estado estacionario (k_star). La simulación revela que, aunque incrementar s eleva temporalmente el capital por trabajador (k), los rendimientos decrecientes del capital (alpha < 1) impiden un crecimiento sostenido, subrayando la necesidad de innovación para mejorar el producto per cápita (y). Además, aumentos en n o delta reducen k_star, evidenciando la dilución del capital y la importancia de políticas que equilibren acumulación y sostenibilidad.
+
+La herramienta Shiny ilustra dinámicas clave como la convergencia al equilibrio (dk/dt = 0) y la sensibilidad no lineal de k_star a cambios en s (gobernada por el exponente 1/(1 - alpha)). Al permitir manipular alpha, se observa cómo valores altos (alpha ≈ 0.5) retrasan la aparición de rendimientos decrecientes, mientras que valores bajos (alpha ≈ 0.3) aceleran la saturación del capital. Estas visualizaciones enfatizan las limitaciones del modelo al excluir factores como capital humano o tecnología endógena, invitando a extensiones teóricas para abordar economías reales.
